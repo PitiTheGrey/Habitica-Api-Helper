@@ -19,9 +19,14 @@ $(function() { // wraps around all our code to not pollute global namespace
 
 "use strict";
 
-var userID = "";
-var apiToken = "";
-var webhookUrl = "";
+var userID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+var apiToken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
+var webhookUrl = "https://xxxxxxxxxxxxxxxxxx/exec";
+var webhookOptions = {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false};
+var totalWebhookOptions = { 'taskActivity': {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false},
+							'userActivity': {"petHatched": true, "mountRaised": true, "leveledUp": true},
+							'questActivity': {"questStarted": false, "questFinished": true, "questInvited": true},
+							'groupChatReceived': {"groupId": "required-uuid-of-group"}};
 
 
 //////////////////////////////////////////////////////////////////////
@@ -29,35 +34,29 @@ var webhookUrl = "";
 ////   										   ///////////////////////			
 //////////////////////////////////////////////////////////////////////
 
-
 async function doAjax(method, url, parameters) {
 	$('#outputContent').html('loading ' + url); 	
 	let result;  
-	console.log(method + ' ' + url + ' ' + JSON.stringify(parameters));
-		try {
-			result = await $.ajax({	
-					url: url,
-					data: parameters, 
-					type: method,
-					dataType: 'json',
-					cache: false,
-					beforeSend: function(xhr){
-						xhr.setRequestHeader('x-client', '9226cae6-d852-45da-a51b-ec2c9cb759e6-API-Tool');
-						xhr.setRequestHeader('x-api-user', userID);
-						xhr.setRequestHeader('x-api-key',  apiToken);
-					},
-					success: function(result){jsonView.format(result.data, '#outputContent');}
-			});
-		} catch (error) {
+	try {
+		result = await $.ajax({	
+				url: url,
+				data: JSON.stringify(parameters), 
+				type: method,
+				dataType: 'json', 
+				contentType: 'application/json', 
+				cache: false,
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('x-client', '9226cae6-d852-45da-a51b-ec2c9cb759e6-API-Tool');
+					xhr.setRequestHeader('x-api-user', userID);
+					xhr.setRequestHeader('x-api-key',  apiToken);
+				},
+				success: function(result){jsonView.format(result.data, '#outputContent');}
+		});
+	} catch (error) {
 			jsonView.format(error.responseText, '#outputContent');
-		}						
+	}						
 }; // end ajax
 
-
-
-function wait(waitTime) {
-	return new Promise(resolve => setTimeout(() => {resolve()}, waitTime));
-}
 
 /////////////////////////////////////////////////
 ///////////////// initialize ////////////////////
@@ -65,7 +64,7 @@ function wait(waitTime) {
 /////////////////////////////////////////////////
 
 
-function setHabiticaDataInputField() {
+function setInputFields() {
 	var newOptions = {
 		"Content": "content",
   		"Party": "groups/party",
@@ -73,19 +72,27 @@ function setHabiticaDataInputField() {
 		"User Profile 2": "user", 
 		"Tasks": "tasks/user", 
 		"Webhooks": "user/webhook"
-		};
+		};	
 	var $el = $("#habiticaData");
 	$el.empty(); // remove old options
 	$.each(newOptions, function(key,value) {
   		$el.append($("<option></option>").attr("value", value).text(key));
 		});
-	
-}
+} // end function setInputFields
 
-setHabiticaDataInputField();
+function setWebhookOptions(type) {
+	webhookOptions = totalWebhookOptions[type];
+	$('#webhookOptions').val(JSON.stringify(webhookOptions)); 
+	console.log(webhookOptions, null, 4); 
+} // end of function setWebhookOptions
+
+setInputFields();
 $('#userId').val(userID);
 $('#apiToken').val(apiToken);
 $('#webhookUrl').val(webhookUrl);
+$('#webhookOptions').prop('value', JSON.stringify(webhookOptions));
+if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('value', true)} else {$('#webhookBoolean').prop('value', false)} 
+
 
 /////////////////////////////////////////////////
 ///////////////// 		  ///////////////////////
@@ -117,6 +124,12 @@ $('#webhookUrl').val(webhookUrl);
 		var type = $('#manualInput').prop('value');
 		await doAjax('PUT', type); 
 	});
+	
+	$('#stringify').on('click', function() {
+		var type = ($('#manualInput').prop('value'));
+		console.log(type, null, 4); 
+		jsonView.format(type, '#outputContent'); 
+	});
 
 	// create delete edit display Buttons in "Habitica Webhooks:"
 	
@@ -124,32 +137,28 @@ $('#webhookUrl').val(webhookUrl);
 		var webhookId = $('#webhookId').prop('value');
 		var webhookUrl = $('#webhookUrl').prop('value');
 		var webhookLabel = $('#webhookLabel').prop('value');
-		var webhookBoolean = $('#webhookBoolen').prop('value');
+		var webhookBoolean = $('#webhookBoolean').prop('value');
 		var webhookType = $('#webhookType').prop('value');
-		var webhookOptions = $('#webhookOptions').prop('value');	
-		var bodyParameters = {'url': webhookUrl, 'label': webhookLabel, 'enabled': webhookBoolean, 'type': webhookType, 'options': webhookOptions };
-		console.log(JSON.stringify(bodyParameters));
+		var webhookOptions = JSON.parse($('#webhookOptions').prop('value'));	
+		var bodyParameters = {'url': webhookUrl, 'label': webhookLabel, 'enabled': webhookBoolean, 'type': webhookType, 'options': webhookOptions};
+		console.log(JSON.stringify(bodyParameters, null, 4));
 		await doAjax('POST', 'https://habitica.com/api/v3/user/webhook', bodyParameters ); 
-	
 	});
 	
-
 	$('#deleteWebhook').on('click', async function() {
 		var webhookId = $('#webhookId').prop('value');
 		await doAjax('DELETE', 'https://habitica.com/api/v3/user/webhook/' + webhookId); 
-	
 	});
 	
-
 	$('#editWebhook').on('click', async function() {
 		var webhookId = $('#webhookId').prop('value');
 		var webhookUrl = $('#webhookUrl').prop('value');
 		var webhookLabel = $('#webhookLabel').prop('value');
-		var webhookBoolean = $('#webhookBoolen').prop('value');
+		var webhookBoolean = Boolean.valueOf($('#webhookBoolen').prop('value'));
 		var webhookType = $('#webhookType').prop('value');
 		var webhookOptions = $('#webhookOptions').prop('value');
-		var bodyParameters = {'id': webhookId, 'url': webhookUrl, 'label': webhookLabel, 'enabled': webhookBoolean, 'type': webhookType, 'options': webhookOptions }
-		console.log(JSON.stringify(bodyParameters));
+		var bodyParameters = {'id': webhookId, 'url': webhookUrl, 'label': webhookLabel, 'enabled': webhookBoolean, 'type': webhookType, 'options': webhookOptions}; 
+		console.log(JSON.stringify(bodyParameters, null, 4));
 		await doAjax('PUT', 'https://habitica.com/api/v3/user/webhook', bodyParameters ); 
 	
 	});
@@ -158,6 +167,9 @@ $('#webhookUrl').val(webhookUrl);
 		await doAjax('GET', 'https://habitica.com/api/v3/user/webhook'); 
 	});
 	
+	$('#webhookType').on('change', function() {
+		setWebhookOptions($('#webhookType').val()); 
+	}); 
 
 }); // end of global Function
 
@@ -203,7 +215,7 @@ body {
 
 <body>
 	<div id="Body">
-		<h1>Habitica Api-Helper <span style="font-size: small">(v. 1.0 February 2020) Use with Chrome. Edge will likely cause error </span>
+		<h1>Habitica Api-Helper <span style="font-size: small">(v. 1.1 February 2020) Use with Chrome. Edge will likely cause error </span>
 		</h1>
 		<div id="loginCredentials">
    		 	<form id="userApiForm" method="POST" action="" target="formPasswdSaveFix">
@@ -230,7 +242,8 @@ body {
 					<textarea style="resize: none" cols="40" rows="2" wrap="soft" type="text" id="manualInputParameters" placeholder="Body Parameters: eg. {'message': 'Hi!', 'toUserId': 'fee352...'}"></textarea>
 					<input type="submit" id="GET" class = "button" value="GET" /> <a class = "button">&nbsp;</a>
 					<input type="submit" id="POST" class = "button" value="POST" /> <a class = "button">&nbsp;</a>
-					<input type="submit" id="PUT" class = "button" value="PUT" /> <p>&nbsp;</p>
+					<input type="submit" id="PUT" class = "button" value="PUT" /> <a class = "button">&nbsp;</a>
+					<input type="submit" id="stringify" class = "button" value="stringify" /><p>&nbsp;</p>
 					<hr>
 				<p>Habitica Webhooks:</p>
 					<input type="text" placeholder="webhook id (optional)" id="webhookId" />
@@ -249,7 +262,7 @@ body {
 						<option value="questActivity">questActivity</option>
 					</select>
 					<br>
-					<input type="text" placeholder="webhook options" id="webhookOptions" />
+					<textarea style="resize: none" cols="40" rows="3" wrap="soft" type="text" id="webhookOptions"></textarea>
 					<br>
 					<br>
 					<input type="submit" id="createWebhook" class="button" value="create" /><a class = "button">&nbsp;</a>
@@ -267,9 +280,12 @@ body {
 				Habitica Api-Helper: <br>
 				<li>Display Data: displays information about Habitica's most common data</li>
 				<li>Manual Input: here you can access the api paths manually. <br>
-					Please use correct buttons Get Post etc.<br>
-					You can add body parameters for api calls. Please provide in {} bracktes, comma-separated </li>
-				<li>Webhooks: if something goes wrong, you can still delete the webhook on habitica website - settings - api - webhook - delete </li>												
+					Please use correct buttons Get Post etc.</li>
+					You can add body parameters for api calls. Please provide in {} bracktes, comma-separated 
+					<li> You can paste JSON-data into the manual input field and display it easy-to-read using the stringify button.
+					</li>
+				<li>Webhooks: if something goes wrong, you can still delete the webhook on habitica website - settings - api - webhook - delete <br>
+					Options-field is editable but will be preselected upon choice of webhook-Type</li>												
 				<!--<div id="outputHeader">Buttons here
 				</div>-->
 				<div id="outputContent">
