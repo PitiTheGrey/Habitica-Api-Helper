@@ -19,9 +19,11 @@ $(function() { // wraps around all our code to not pollute global namespace
 
 "use strict";
 
-var userID = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-var apiToken = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx";
-var webhookUrl = "https://xxxxxxxxxxxxxxxxxx/exec";
+
+var userId = "";
+var apiToken = "";
+
+var webhookUrl = "https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec";
 var webhookOptions = {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false};
 var totalWebhookOptions = { 'taskActivity': {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false},
 							'userActivity': {"petHatched": true, "mountRaised": true, "leveledUp": true},
@@ -29,33 +31,84 @@ var totalWebhookOptions = { 'taskActivity': {"created": true, "updated": true, "
 							'groupChatReceived': {"groupId": "required-uuid-of-group"}};
 
 
+
 //////////////////////////////////////////////////////////////////////
 ////   API call								   ///////////////////////
 ////   										   ///////////////////////			
 //////////////////////////////////////////////////////////////////////
 
-async function doAjax(method, url, parameters) {
-	$('#outputContent').html('loading ' + url); 	
+async function doAjax(method, url, parameters, payload) {  // parameters and payload come in as strings
+	$('#outputContent').html('loading ' + url); 
+	userId = $('#userId').prop('value');
+	apiToken = $('#apiToken').prop('value'); 
+
+	if (parameters == "" || parameters == "undefined") {
+		parameters = {};
+	} 
+	if (typeof(parameters) == "string") {
+		parameters = JSON.parse(parameters);
+	}
+	
+	if (payload == "" || payload == "undefined") {
+		payload = {};
+
+	} 
+	if (typeof(payload) == "string") {
+		payload = JSON.parse(payload);
+	} 
+	console.log("payload: " + payload + JSON.stringify(payload) + typeof(payload)); // stringifying a string causes unwanted backslashes
+	console.log("parameters: " + parameters + JSON.stringify(parameters) + typeof(parameters)); 
+
 	let result;  
+	console.log(userId +"/"+  apiToken); 
 	try {
 		result = await $.ajax({	
 				url: url,
 				data: JSON.stringify(parameters), 
+				payload: JSON.stringify(payload), // string
 				type: method,
 				dataType: 'json', 
 				contentType: 'application/json', 
 				cache: false,
 				beforeSend: function(xhr){
 					xhr.setRequestHeader('x-client', '9226cae6-d852-45da-a51b-ec2c9cb759e6-API-Tool');
-					xhr.setRequestHeader('x-api-user', userID);
+					xhr.setRequestHeader('x-api-user', userId);
 					xhr.setRequestHeader('x-api-key',  apiToken);
 				},
 				success: function(result){jsonView.format(result.data, '#outputContent');}
 		});
 	} catch (error) {
+			console.log(error.responseText);
 			jsonView.format(error.responseText, '#outputContent');
+			jsonView.format(payload, '#outputContent');
 	}						
 }; // end ajax
+
+async function postToWebhookServer(method, url, parameters) {
+	let result; 
+	
+	var contents = {"type":"scored","quest":{"key":"basilist"},"webhookType":"questActivity","user":{"_id":"f95b5e72-4789-415d-b0bc-6dfd3c24818a"}}; 
+	var payload = {"type":"application/json","length":209,"contents": contents,"name":"postData"}; 
+	var data =  {"parameter":{},"contextPath":"","contentLength":209,"queryString":"","parameters":{}, "postData": payload};
+	try {
+		result = await $.ajax({
+			url: url, 
+			//data: 'payload={"postData":{"contents":{"type":"scored"}}}', 
+			//payload: JSON.stringify(payload),
+			data: JSON.stringify(data),
+			type: "POST",  
+			dataType: 'text', 
+			//dataType: 'json', 
+			contentType: 'text/plain', 
+			processData: false, 
+			success: function(result){jsonView.format(result.data, '#outputContent');}
+		})
+	} catch (error) {
+		console.log(JSON.stringify(data, null, 4));
+		console.log(error.responseText); 
+		jsonView.format(error.responseText, '#outputContent'); 
+	}
+}
 
 
 /////////////////////////////////////////////////
@@ -80,6 +133,10 @@ function setInputFields() {
 		});
 } // end function setInputFields
 
+userId = $('#userId').prop('value');
+apiToken = $('#apiToken').prop('value'); 
+
+
 function setWebhookOptions(type) {
 	webhookOptions = totalWebhookOptions[type];
 	$('#webhookOptions').val(JSON.stringify(webhookOptions)); 
@@ -87,8 +144,8 @@ function setWebhookOptions(type) {
 } // end of function setWebhookOptions
 
 setInputFields();
-$('#userId').val(userID);
-$('#apiToken').val(apiToken);
+//$('#userId').val(userId);
+//$('#apiToken').val(apiToken);
 $('#webhookUrl').val(webhookUrl);
 $('#webhookOptions').prop('value', JSON.stringify(webhookOptions));
 if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('value', true)} else {$('#webhookBoolean').prop('value', false)} 
@@ -122,7 +179,9 @@ if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('v
 	
 	$('#PUT').on('click', async function() {
 		var type = $('#manualInput').prop('value');
-		await doAjax('PUT', type); 
+		var bodyParameters = ($('#manualInputParameters').prop('value'));
+		var payload = ($('#manualInputPayload').prop('value'));
+		await doAjax('PUT', type, bodyParameters, payload);
 	});
 	
 	$('#stringify').on('click', function() {
@@ -171,6 +230,9 @@ if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('v
 		setWebhookOptions($('#webhookType').val()); 
 	}); 
 
+	$('#simulate').on('click', async function() {
+		await postToWebhookServer('POST', $('#webhookUrl').prop('value'), $('#webhookOptions'));
+	})
 }); // end of global Function
 
 </script>
@@ -215,7 +277,7 @@ body {
 
 <body>
 	<div id="Body">
-		<h1>Habitica Api-Helper <span style="font-size: small">(v. 1.1 February 2020) Use with Chrome. Edge will likely cause error </span>
+		<h1>Habitica Api-Helper <span style="font-size: small">(v. 1.0 February 2020) Use with Chrome. Edge will likely cause error </span>
 		</h1>
 		<div id="loginCredentials">
    		 	<form id="userApiForm" method="POST" action="" target="formPasswdSaveFix">
@@ -240,10 +302,12 @@ body {
 				<p>Manual input field:</p> 
 					<textarea style="resize: none" cols="40" rows="3" wrap="soft" type="text" id="manualInput" value="">https://habitica.com/api/v3/</textarea>
 					<textarea style="resize: none" cols="40" rows="2" wrap="soft" type="text" id="manualInputParameters" placeholder="Body Parameters: eg. {'message': 'Hi!', 'toUserId': 'fee352...'}"></textarea>
+					<textarea style="resize: none" cols="40" rows="2" wrap="soft" type="text" id="manualInputPayload" placeholder="Payload: eg. {'preferences.chair': 'none'}"></textarea>
 					<input type="submit" id="GET" class = "button" value="GET" /> <a class = "button">&nbsp;</a>
 					<input type="submit" id="POST" class = "button" value="POST" /> <a class = "button">&nbsp;</a>
 					<input type="submit" id="PUT" class = "button" value="PUT" /> <a class = "button">&nbsp;</a>
 					<input type="submit" id="stringify" class = "button" value="stringify" /><p>&nbsp;</p>
+					
 					<hr>
 				<p>Habitica Webhooks:</p>
 					<input type="text" placeholder="webhook id (optional)" id="webhookId" />
@@ -268,7 +332,8 @@ body {
 					<input type="submit" id="createWebhook" class="button" value="create" /><a class = "button">&nbsp;</a>
 					<input type="submit" id="deleteWebhook" class="button" value="delete" /> <a class = "button">&nbsp;</a>
 					<input type="submit" id="editWebhook" class="button" value="edit" /> <a class = "button">&nbsp;</a>
-					<input type="submit" id="displayWebhook" class="button" value="display" />					
+					<input type="submit" id="displayWebhook" class="button" value="display" /> <a class="button">&nbsp;</a>	
+							
 					<br><br>
 				<hr>
 				<a target="_blank" href="https://habitica.com/apidoc/">https://habitica.com/apidoc/</a>
