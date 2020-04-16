@@ -1,7 +1,7 @@
 # Habitica-Api-Helper
 Javascript App for displaying Habitica Data and manually interact with Habitica's Api
 
-Please add your Habitica UserId and ApiToken into the code 'apihelper.html'
+Please add your Habitica UserId and ApiToken into the code 'apihelper.html' or enter them in the data.js file and include the file in the same directory as the html file.
 
 Data Display can help you identifiying infomation inside Habiticas JSON data. 
 
