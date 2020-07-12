@@ -22,13 +22,15 @@ $(function() { // wraps around all our code to not pollute global namespace
 
 "use strict";
 
+var serverURL = ""; 
+
 var index = index || 0; 
 let userID = ID[index] || {}; 
 let apiToken = token[index] || {};
 $('#userId').prop('value', userID);
 $('#apiToken').prop('value', apiToken);
 
-var webhookUrl = "https://script.google.com/macros/s/AKfycbzA9KAXwVwKs6UaP5AJSc19zf0kH4G_XXKrW8tgSKiBFHJbDKEP/exec";
+//var webhookUrl = "https://script.google.com/macros/s/AKfycbzA9KAXwVwKs6UaP5AJSc19zf0kH4G_XXKrW8tgSKiBFHJbDKEP/exec";
 var webhookOptions = {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false};
 var totalWebhookOptions = { 'taskActivity': {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false},
 							'userActivity': {"petHatched": true, "mountRaised": true, "leveledUp": true},
@@ -64,29 +66,29 @@ async function doAjax(method, url, parameters, payload) {  // parameters and pay
 	console.log("payload: " + payload + JSON.stringify(payload) + typeof(payload)); // stringifying a string causes unwanted backslashes
 	console.log("parameters: " + parameters + JSON.stringify(parameters) + typeof(parameters)); 
 
-	let result;  
+	let result;
 	console.log(userID +"/"+  apiToken); 
 	try {
-		result = await $.ajax({	
+		result = await $.ajax({
 				url: url,
-				data: JSON.stringify(parameters), 
+				data: JSON.stringify(parameters),
 				payload: JSON.stringify(payload), // string
 				type: method,
-				dataType: 'json', 
-				contentType: 'application/json', 
+				dataType: 'json',
+				contentType: 'application/json',
 				cache: false,
 				beforeSend: function(xhr){
 					xhr.setRequestHeader('x-client', '9226cae6-d852-45da-a51b-ec2c9cb759e6-API-Tool');
 					xhr.setRequestHeader('x-api-user', userID);
 					xhr.setRequestHeader('x-api-key',  apiToken);
 				},
-				success: function(result){jsonView.format(result.data, '#outputContent');}
+				success: function(result){jsonView.format(JSON.stringify(result), '#outputContent');} // !JSON.stringfy but result.data
 		});
 	} catch (error) {
 			console.log(error.responseText);
 			jsonView.format(error.responseText, '#outputContent');
 			jsonView.format(payload, '#outputContent');
-	}						
+	}
 }; // end ajax
 
 async function postToWebhookServer(method, url, parameters) {
@@ -189,6 +191,16 @@ function setInputFields() {
 	$.each(newOptions, function(key,value) {
   		$el.append($("<option></option>").attr("value", value).text(key));
 		});
+	newOptions = {
+		"https://habitica.com/api/v3": internet,
+		"localhost:[port]": localhost
+		};
+	$el = $("#accessPath");
+	$el.empty();
+	$.each(newOptions, function(key, value) {
+		$el.append($("<option></option>").attr("value", value).text(key));
+		});	
+	serverURL = ($('#accessPath').val());
 } // end function setInputFields
 
 function setWebhookOptions(type) {
@@ -208,29 +220,36 @@ if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('v
 ///////////////// Buttons ///////////////////////
 /////////////////////////////////////////////////
 
-	$('#credentials').on('click', function() {		
+	$('#credentials').on('click', function() {
 		// get index of current userID
-		var i; 
+		var i;
 		for (i = 0; i < ID.length; i++) {
 			if (userID == ID[i]) {
 				index = i;
-				console.log("userID = ID bei Index=" + index); 
+				console.log("userID = ID bei Index=" + index);
 			}
 		}
-		
-		index < ID.length-1 ? index++ : index = 0;  
-		userID = ID[index]; 
-		apiToken = token[index]; 
+
+		index < ID.length-1 ? index++ : index = 0;
+		userID = ID[index];
+		apiToken = token[index];
 		$('#userId').prop('value', userID);
-		$('#apiToken').prop('value', apiToken); 	
-		console.log(userID); 
+		$('#apiToken').prop('value', apiToken);
+		console.log(userID);
 	})
+	
+	// choose access path
+	$('#accessPath').on('change', function() {
+		serverURL = ($('#accessPath').val());
+        $('#manualInput').val(serverURL);
+	});
 	 
 	// GET Button in "Display some Habitica Data:"
 
 	$('#habiticaDataButton').on('click', async function() {
 		var type = $('#habiticaData').prop('value');
-		await doAjax('GET', 'https://habitica.com/api/v3/' + type); 
+		await doAjax('GET', serverURL + type);
+        console.log(serverURL + type);
 	});
 			
     // GET POST PUT Buttons in "Manual input field:"
@@ -242,7 +261,7 @@ if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('v
 	
 	$('#POST').on('click', async function() {
 		var type = $('#manualInput').prop('value');
-		var bodyParameters = JSON.parse($('#manualInputParameters').prop('value'));
+		var bodyParameters = ($('#manualInputParameters').prop('value'));
 		await doAjax('POST', type, bodyParameters); 
 	});
 	
@@ -270,12 +289,12 @@ if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('v
 		var webhookOptions = JSON.parse($('#webhookOptions').prop('value'));	
 		var bodyParameters = {'url': webhookUrl, 'label': webhookLabel, 'enabled': webhookBoolean, 'type': webhookType, 'options': webhookOptions};
 		console.log(JSON.stringify(bodyParameters, null, 4));
-		await doAjax('POST', 'https://habitica.com/api/v3/user/webhook', bodyParameters ); 
+		await doAjax('POST', serverURL + 'user/webhook', bodyParameters ); 
 	});
 	
 	$('#deleteWebhook').on('click', async function() {
 		var webhookId = $('#webhookId').prop('value');
-		await doAjax('DELETE', 'https://habitica.com/api/v3/user/webhook/' + webhookId); 
+		await doAjax('DELETE', serverURL +'user/webhook/' + webhookId); 
 	});
 	
 	$('#editWebhook').on('click', async function() {
@@ -287,12 +306,12 @@ if ($('#webhookBoolean').prop('value') == "true")  {$('#webhookBoolean').prop('v
 		var webhookOptions = $('#webhookOptions').prop('value');
 		var bodyParameters = {'id': webhookId, 'url': webhookUrl, 'label': webhookLabel, 'enabled': webhookBoolean, 'type': webhookType, 'options': webhookOptions}; 
 		console.log(JSON.stringify(bodyParameters, null, 4));
-		await doAjax('PUT', 'https://habitica.com/api/v3/user/webhook', bodyParameters ); 
+		await doAjax('PUT', serverURL + 'user/webhook', bodyParameters ); 
 	
 	});
 	
 	$('#displayWebhook').on('click', async function() {
-		await doAjax('GET', 'https://habitica.com/api/v3/user/webhook'); 
+		await doAjax('GET', serverURL + 'user/webhook'); 
 	});
 	
 	$('#testWebhook').on('click', async function() {
@@ -362,6 +381,12 @@ body {
             		</label>			
 				</form>
 				<input type="submit" id="credentials" value="++" class="button" />
+				<label for="Access Path"><span>Access Path</span>
+					<select id="accessPath">
+						<option value="https://habitica.com/api/v3/">internet</option>
+						<option value="localhost">localHost</option>
+					</select>
+				</label>
 			</fieldset>
 
 		
