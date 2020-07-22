@@ -30,6 +30,7 @@ let apiToken = token[index] || {};
 $('#userId').prop('value', userID);
 $('#apiToken').prop('value', apiToken);
 
+
 var webhookOptions = {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false};
 var totalWebhookOptions = { 'taskActivity': {"created": true, "updated": true, "deleted": true, "scored": true, "checklistScored": false},
 							'userActivity': {"petHatched": true, "mountRaised": true, "leveledUp": true},
@@ -81,7 +82,13 @@ async function doAjax(method, url, parameters, payload) {  // parameters and pay
 					xhr.setRequestHeader('x-api-user', userID);
 					xhr.setRequestHeader('x-api-key',  apiToken);
 				},
-				success: function(result){jsonView.format(JSON.stringify(result), '#outputContent');} // !JSON.stringfy but result.data
+				success: function(result, status, xhr){ // xhr on 3rd place!
+                        		console.log(status);
+                       			console.log(xhr.getResponseHeader("x-ratelimit-limit"));
+                        		console.log(xhr.getResponseHeader("x-ratelimit-remaining"));
+                        		console.log(xhr.getResponseHeader("x-ratelimit-reset"));
+                       			jsonView.format(JSON.stringify(result), '#outputContent');
+                    } // !JSON.stringfy but result.data
 		});
 	} catch (error) {
 			console.log(error.responseText);
@@ -367,7 +374,7 @@ body {
 
 <body>
 	<div id="Body">
-		<h1>Habitica Api-Helper <span style="font-size: small">(v. 1.2 July 2020) Use with Chrome. Edge will likely cause error </span>
+		<h1>Habitica Api-Helper <span style="font-size: small">(v. 1.0 February 2020) Use with Chrome. Edge will likely cause error </span>
 		</h1>
 		<div id="loginCredentials">
 			<fieldset>
